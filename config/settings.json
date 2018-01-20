@@ -1,0 +1,12 @@
+{
+  "filter_exchanges": true,
+  "exchanges": [
+    "gateio",
+    "binance"
+  ],
+  "filter_tickets": false,
+  "tickets": [
+    "/BTC",
+    "/USDT"
+  ]
+}

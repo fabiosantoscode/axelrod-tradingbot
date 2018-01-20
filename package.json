@@ -3,7 +3,8 @@
   "description": "Trading bot for cryptocurrency",
   "version": "1.0.0",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "author": {
     "name": "Gabriel Barbosa",
