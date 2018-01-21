@@ -7,34 +7,37 @@ const arbitrage = require('./arbitrage');
 exports.initialize = async function() {
   try {
     const tickets = await prepareTickets();
+    console.info('Tickets to be monitored:', tickets.length);
     for (let ticket of tickets) {
       try {
         startArbitrageByTicket(ticket);
+        setInterval(function() {
+          startArbitrageByTicket(ticket)
+        }, (configs.checkInterval > 0 ? configs.checkInterval : 1) * 60000);
       } catch (error) {
         console.error('Error:', error.message);
       }
     }
+    console.info('Bot started.')
   } catch (error) {
     console.error('Error:', error.message);
   }
 }
 
 async function startArbitrageByTicket(ticket) {
-  setInterval(function() {
-    try {
-      let promises = ticket.exchanges.map(async (exchange) =>
-        Promise.resolve(await fetchDataByTicketAndExchange(
-          ticket.symbol, exchange)));
+  try {
+    let promises = ticket.exchanges.map(async (exchange) =>
+      Promise.resolve(await fetchDataByTicketAndExchange(
+        ticket.symbol, exchange)));
 
-      Promise.all(promises).then((response) => {
-        arbitrage.checkOpportunity(response);
-      }).catch((error) => {
-        console.error('Error:', error.message);
-      });
-    } catch (error) {
+    Promise.all(promises).then((response) => {
+      arbitrage.checkOpportunity(response);
+    }).catch((error) => {
       console.error('Error:', error.message);
-    }
-  }, 30 * 1000);
+    });
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
 }
 
 async function fetchDataByTicketAndExchange(ticket, exchangeName) {
@@ -54,7 +57,7 @@ async function prepareTickets() {
   let api = {}
   let exchanges = [];
 
-  if (configs.filter_exchanges) {
+  if (configs.filter.exchanges) {
     exchanges = configs.exchanges;
   } else {
     exchanges = ccxt.exchanges;
@@ -65,7 +68,7 @@ async function prepareTickets() {
       let exch = new ccxt[name]();
       api[name] = exch;
       let markets = await exch.loadMarkets();
-      if (!configs.filter_exchanges) {
+      if (!configs.filter.exchanges) {
         exchanges.push(name);
       }
     } catch (error) {
@@ -75,7 +78,7 @@ async function prepareTickets() {
 
   let symbols = [];
   ccxt.unique(ccxt.flatten(exchanges.map(name => api[name].symbols))).filter(symbol =>
-    ((configs.filter_tickets) ? configs.tickets.map(tn =>
+    ((configs.filter.tickets) ? configs.tickets.map(tn =>
       (symbol.indexOf(tn) >= 0) ? symbols.push(symbol) : 0) : symbols.push(symbol)));
 
   let arbitrables = symbols.filter(symbol => exchanges.filter(name =>

@@ -1,12 +1,22 @@
 {
-  "filter_exchanges": true,
+  "checkInterval": 5,
+  "arbitrage": {
+    "open": 4.00,
+    "close": 2.00
+  },
+  "filter": {
+    "exchanges": true,
+    "tickets": true
+  },
   "exchanges": [
     "gateio",
-    "binance"
+    "binance",
+    "mercado",
+    "foxbit"
   ],
-  "filter_tickets": false,
   "tickets": [
     "/BTC",
-    "/USDT"
+    "/ETH",
+    "/BRL"
   ]
 }

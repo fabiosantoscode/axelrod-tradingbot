@@ -20,7 +20,7 @@ The name was inspired by the protagonist of the series [Billions](http://www.imd
 
 ## Exchanges
 
-We use the [ccxt](https://github.com/ccxt/ccxt/wiki/Manual#exchanges) library, so all exchanges that do not require token and secrecy are integrated.
+We use the [ccxt](https://github.com/ccxt/ccxt/wiki/Manual#exchanges) library, so all exchanges that do not require token and secret are integrated.
 
 ## Disclaimer
 > Axelrod Trading Bot is not to be used as financial advice or a guide for any financial investments, it's a experiment. Use at your own risk!
