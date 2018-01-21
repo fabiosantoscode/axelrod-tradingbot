@@ -1,6 +1,7 @@
 'use strict';
 
 const lodash = require('lodash');
+const configs = require('../config/settings');
 
 function getFunds() {
   return 1000.00;
@@ -43,7 +44,7 @@ exports.checkOpportunity = async function(prices) {
     }
 
     let index = lastOpportunities.indexOf(opportunity.id);
-    if (index == -1 && percentage >= 5.00) {
+    if (index == -1 && percentage >= configs.arbitrage.open) {
 
       console.log('');
       console.info('✔ Opportunity found:');
@@ -51,7 +52,7 @@ exports.checkOpportunity = async function(prices) {
       console.info('\n', opportunity);
       lastOpportunities.push(opportunity.id);
 
-    } else if (index != -1 && percentage < 2.50) {
+    } else if (index != -1 && percentage <= configs.arbitrage.close) {
 
       console.log('');
       console.info('✔ Opportunity closed:', opportunity.id);
