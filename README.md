@@ -24,3 +24,13 @@ We use the [ccxt](https://github.com/ccxt/ccxt/wiki/Manual#exchanges) library, s
 
 ## Disclaimer
 > Axelrod Trading Bot is not to be used as financial advice or a guide for any financial investments, it's a experiment. Use at your own risk!
+
+## License
+See the LICENSE.md file for details
+
+## Donating
+BTC: 1H85Eb2gHFvLJj3kRW3PSyYbwrdvjy1AXn
+
+ETH: 0xb1f022a0b34fb7531e8812e2fdd471e5a222819f
+
+LTC: LYXejx1uQccosx16yLo3pCf1qALEH42hak
