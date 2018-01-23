@@ -2,6 +2,9 @@
 
 const lodash = require('lodash');
 const configs = require('../config/settings');
+const colors = require('colors');
+const util = require('util');
+
 
 function getFunds() {
   return 1000.00;
@@ -47,15 +50,15 @@ exports.checkOpportunity = async function(prices) {
     if (index == -1 && percentage >= configs.arbitrage.open) {
 
       console.log('');
-      console.info('✔ Opportunity found:');
-      console.info('  Estimated gain:', percentage, '% |', estimatedGain);
-      console.info('\n', opportunity);
+      console.info('✔ Opportunity found:'.green);
+      console.info('  Estimated gain:', colors.green(percentage), '% |', colors.green(estimatedGain));
+      console.info('\n', util.inspect(opportunity, {colors: true}));
       lastOpportunities.push(opportunity.id);
 
     } else if (index != -1 && percentage <= configs.arbitrage.close) {
 
       console.log('');
-      console.info('✔ Opportunity closed:', opportunity.id);
+      console.info(colors.yellow('✔ Opportunity closed: %s'), opportunity.id);
       lastOpportunities.splice(index);
 
     }

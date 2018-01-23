@@ -3,6 +3,7 @@
 const ccxt = require('ccxt');
 const configs = require('../config/settings');
 const arbitrage = require('./arbitrage');
+const colors = require('colors');
 
 exports.initialize = async function() {
   try {
