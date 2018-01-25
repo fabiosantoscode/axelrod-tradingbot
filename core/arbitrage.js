@@ -4,11 +4,8 @@ const lodash = require('lodash');
 const configs = require('../config/settings');
 const colors = require('colors');
 const util = require('util');
-
-
-function getFunds() {
-  return 1000.00;
-}
+const json2csv = require('json2csv');
+const fs = require('fs');
 
 let lastOpportunities = [];
 
@@ -38,6 +35,7 @@ exports.checkOpportunity = async function(prices) {
     let opportunity = {
       id: bestAsk.ticket.toLowerCase() + '-' + bestAsk.name + '-' + bestBid.name,
       created_at: new Date(),
+      ticket: bestAsk.ticket,
       amount: Number(amount.toFixed(8)),
       buy_at: bestAsk.name,
       ask: bestAsk.ask,
@@ -52,7 +50,11 @@ exports.checkOpportunity = async function(prices) {
       console.log('');
       console.info('✔ Opportunity found:'.green);
       console.info('  Estimated gain:', colors.green(percentage), '% |', colors.green(estimatedGain));
-      console.info('\n', util.inspect(opportunity, {colors: true}));
+      console.info('\n', util.inspect(opportunity, {
+        colors: true
+      }));
+
+      register(opportunity);
       lastOpportunities.push(opportunity.id);
 
     } else if (index != -1 && percentage <= configs.arbitrage.close) {
@@ -63,6 +65,28 @@ exports.checkOpportunity = async function(prices) {
 
     }
 
+  }
+
+}
+
+function getFunds() {
+  return 1000.00;
+}
+
+function register(opportunity) {
+
+  let toCsv = {
+    data: opportunity,
+    hasCSVColumnTitle: false
+  };
+
+  try {
+    let csv = json2csv(toCsv) + '\r\n';
+    fs.appendFile('data/arbitrage.csv', csv, function(err) {
+      if (err) throw err;
+    });
+  } catch (error) {
+    console.error('Error:', error.message);
   }
 
 }
