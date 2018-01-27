@@ -86,7 +86,7 @@ function register(opportunity) {
       if (err) throw err;
     });
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error(colors.red('Error:'), error.message);
   }
 
 }
