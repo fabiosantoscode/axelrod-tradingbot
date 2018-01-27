@@ -16,12 +16,12 @@ exports.initialize = async function() {
           startArbitrageByTicket(ticket)
         }, (configs.checkInterval > 0 ? configs.checkInterval : 1) * 60000);
       } catch (error) {
-        console.error('Error:', error.message);
+        console.error(colors.red('Error:'), error.message);
       }
     }
     console.info('Bot started.')
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error(colors.red('Error:'), error.message);
   }
 }
 
@@ -34,10 +34,10 @@ async function startArbitrageByTicket(ticket) {
     Promise.all(promises).then((response) => {
       arbitrage.checkOpportunity(response);
     }).catch((error) => {
-      console.error('Error:', error.message);
+      console.error(colors.red('Error:'), error.message);
     });
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error(colors.red('Error:'), error.message);
   }
 }
 
@@ -73,7 +73,7 @@ async function prepareTickets() {
         exchanges.push(name);
       }
     } catch (error) {
-      console.error('Error:', error.message);
+      console.error(colors.red('Error:'), error.message);
     }
   }
 
