@@ -11,12 +11,14 @@
   "exchanges": [
     "gateio",
     "binance",
+    "kraken",
     "mercado",
     "foxbit"
   ],
   "tickets": [
     "/BTC",
     "/ETH",
+    "/USD",
     "/BRL"
   ]
 }
