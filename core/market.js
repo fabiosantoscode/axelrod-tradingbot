@@ -7,19 +7,15 @@ const colors = require('colors');
 
 exports.initialize = async function() {
   try {
+    console.info('\nLoading exchanges and tickets...');
     const tickets = await prepareTickets();
-    console.info('Tickets to be monitored:', tickets.length);
     for (let ticket of tickets) {
-      try {
-        startArbitrageByTicket(ticket);
-        setInterval(function() {
-          startArbitrageByTicket(ticket)
-        }, (configs.checkInterval > 0 ? configs.checkInterval : 1) * 60000);
-      } catch (error) {
-        console.error(colors.red('Error:'), error.message);
-      }
+      startArbitrageByTicket(ticket);
+      setInterval(function() {
+        startArbitrageByTicket(ticket)
+      }, (configs.checkInterval > 0 ? configs.checkInterval : 1) * 60000);
     }
-    console.info('Bot started.')
+    console.info('Bot started.');
   } catch (error) {
     console.error(colors.red('Error:'), error.message);
   }
@@ -42,15 +38,25 @@ async function startArbitrageByTicket(ticket) {
 }
 
 async function fetchDataByTicketAndExchange(ticket, exchangeName) {
-  const exchange = new ccxt[exchangeName]();
-  const market = await exchange.fetchTicker(ticket);
-
-  return {
+  let result = {
     name: exchangeName,
     ticket: ticket,
     cost: 0.005,
-    bid: market.bid,
-    ask: market.ask
+    bid: 0,
+    ask: 0
+  };
+
+  try {
+    const exchange = new ccxt[exchangeName]();
+    const market = await exchange.fetchTicker(ticket);
+    if (market != undefined && market != null) {
+      result.bid = market.bid;
+      result.ask = market.ask;
+    }
+  } catch (error) {
+
+  } finally {
+    return result;
   }
 }
 
@@ -64,16 +70,15 @@ async function prepareTickets() {
     exchanges = ccxt.exchanges;
   }
 
-  for (let name of exchanges) {
+  for (let i = exchanges.length - 1; i >= 0; i--) {
+    let name = exchanges[i];
     try {
-      let exch = new ccxt[name]();
-      api[name] = exch;
-      let markets = await exch.loadMarkets();
-      if (!configs.filter.exchanges) {
-        exchanges.push(name);
-      }
+      let _instance = new ccxt[name]();
+      await _instance.loadMarkets();
+      api[name] = _instance;
     } catch (error) {
       console.error(colors.red('Error:'), error.message);
+      exchanges.splice(exchanges.indexOf(name), 1);
     }
   }
 
@@ -97,5 +102,6 @@ async function prepareTickets() {
     return row
   });
 
+  console.info('Exchanges:', colors.green(exchanges.length), '| Tickets:', colors.green(tickets.length));
   return tickets;
 }
