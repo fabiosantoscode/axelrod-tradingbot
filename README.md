@@ -1,4 +1,6 @@
 # AXELROD TRADING BOT
+
+[![Greenkeeper badge](https://badges.greenkeeper.io/bielversallini/axelrod-tradingbot.svg)](https://greenkeeper.io/)
 *Trading Bot for Cryptocurrency*
 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
