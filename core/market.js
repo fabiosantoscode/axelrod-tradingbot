@@ -13,7 +13,7 @@ exports.initialize = async function() {
       startArbitrageByTicket(ticket);
       setInterval(function() {
         startArbitrageByTicket(ticket)
-      }, (configs.checkInterval > 0 ? configs.checkInterval : 1) * 60000);
+      }, (configs.arbitrage.checkInterval > 0 ? configs.arbitrage.checkInterval : 1) * 60000);
     }
     console.info('Bot started.');
   } catch (error) {
@@ -64,8 +64,8 @@ async function prepareTickets() {
   let api = {}
   let exchanges = [];
 
-  if (configs.filter.exchanges) {
-    exchanges = configs.exchanges;
+  if (configs.arbitrage.filter.exchanges) {
+    exchanges = configs.arbitrage.exchanges;
   } else {
     exchanges = ccxt.exchanges;
   }
@@ -84,7 +84,7 @@ async function prepareTickets() {
 
   let symbols = [];
   ccxt.unique(ccxt.flatten(exchanges.map(name => api[name].symbols))).filter(symbol =>
-    ((configs.filter.tickets) ? configs.tickets.map(tn =>
+    ((configs.arbitrage.filter.tickets) ? configs.arbitrage.tickets.map(tn =>
       (symbol.indexOf(tn) >= 0) ? symbols.push(symbol) : 0) : symbols.push(symbol)));
 
   let arbitrables = symbols.filter(symbol => exchanges.filter(name =>

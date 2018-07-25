@@ -45,7 +45,7 @@ exports.checkOpportunity = async function(prices) {
     }
 
     let index = lastOpportunities.indexOf(opportunity.id);
-    if (index == -1 && percentage >= configs.arbitrage.open) {
+    if (index == -1 && percentage >= configs.arbitrage.openOpportunity) {
 
       console.log('');
       console.info('✔ Opportunity found:'.green);
@@ -57,7 +57,7 @@ exports.checkOpportunity = async function(prices) {
       register(opportunity);
       lastOpportunities.push(opportunity.id);
 
-    } else if (index != -1 && percentage <= configs.arbitrage.close) {
+    } else if (index != -1 && percentage <= configs.arbitrage.closeOpportunity) {
 
       console.log('');
       console.info(colors.yellow('✔ Opportunity closed: %s'), opportunity.id);
