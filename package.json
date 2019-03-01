@@ -14,7 +14,7 @@
     "ccxt": "^1.10.713",
     "colors": "^1.1.2",
     "json2csv": "^3.11.5",
-    "lodash": "^4.17.10"
+    "lodash": "^4.17.11"
   },
   "devDependencies": {
     "nodemon": "^1.18.3",
