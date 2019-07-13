@@ -1,7 +1,7 @@
 {
   "name": "axelrod-trading-bot",
   "description": "Trading bot for cryptocurrency",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"
@@ -10,11 +10,14 @@
     "name": "Gabriel Barbosa",
     "email": "gabriel@versallini.com.br"
   },
+  "engines": {
+    "node": "10.x"
+  },
   "dependencies": {
     "ccxt": "^1.10.713",
     "colors": "^1.1.2",
     "json2csv": "^3.11.5",
-    "lodash": "^4.17.11"
+    "lodash": "^4.17.13"
   },
   "devDependencies": {
     "nodemon": "^1.18.3",
