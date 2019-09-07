@@ -2,11 +2,14 @@
 
 const market = require('./core/market');
 
-(async function () {
-
+(async function main() {
   console.log('Axelrod Trading Bot - Follow the money!');
   console.log('=======================================');
-  
-  market.initialize();
 
+  try {
+    await market.initialize();
+  } catch (error) {
+    console.error(error);
+    process.exit(1)
+  }
 })();

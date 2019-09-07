@@ -1,62 +1,68 @@
 'use strict';
 
+const lodash = require('lodash')
+const async = require('async')
 const ccxt = require('ccxt');
 const configs = require('../config/settings');
 const arbitrage = require('./arbitrage');
 const colors = require('colors');
+const retries = require('./retries')
+
+const INTERVAL = configs.checkInterval > 0
+  ? Number(configs.checkInterval)
+  : 1
 
 exports.initialize = async function() {
-  try {
-    console.info('\nLoading exchanges and tickets...');
-    const tickets = await prepareTickets();
-    for (let ticket of tickets) {
-      startArbitrageByTicket(ticket);
-      setInterval(function() {
-        startArbitrageByTicket(ticket)
-      }, (configs.arbitrage.checkInterval > 0 ? configs.arbitrage.checkInterval : 1) * 60000);
-    }
-    console.info('Bot started.');
-  } catch (error) {
-    console.error(colors.red('Error:'), error.message);
+  console.info('\nLoading exchanges and tickets...');
+  const tickets = await prepareTickets();
+  for (const ticket of tickets) {
+    await (async function loop(isFirstExecution) {
+      try {
+        await startArbitrageByTicket(ticket, isFirstExecution);
+      } catch (e) {
+        console.error(e)
+      }
+      setTimeout(loop, INTERVAL * 60 * 1000)
+    })(true)
   }
+  console.info('Bot started.');
 }
 
-async function startArbitrageByTicket(ticket) {
+async function startArbitrageByTicket(ticket, isFirstExecution) {
   try {
-    let promises = ticket.exchanges.map(async (exchange) =>
-      Promise.resolve(await fetchDataByTicketAndExchange(
-        ticket.symbol, exchange)));
+    if (isFirstExecution) {
+      console.log(ticket.symbol + ':', ticket.exchanges)
+    }
+    const prices = await Promise.all(ticket.exchanges.map((exchange) =>
+        fetchDataByTicketAndExchange(ticket.symbol, exchange)))
 
-    Promise.all(promises).then((response) => {
-      arbitrage.checkOpportunity(response);
-    }).catch((error) => {
-      console.error(colors.red('Error:'), error.message);
-    });
+    const [buyOrSell, opportunity] = await arbitrage.getOrder({ prices, ticket, funds: 1000 })
+
+    if (buyOrSell) {
+      const orderType = buyOrSell === 'buy' ? colors.red(buyOrSell) : colors.green(buyOrSell)
+      console.log('ORDER: ' + orderType + ' ' + opportunity.amount + ' ' + opportunity.ticket.symbol, opportunity)
+    }
   } catch (error) {
     console.error(colors.red('Error:'), error.message);
   }
 }
 
 async function fetchDataByTicketAndExchange(ticket, exchangeName) {
-  let result = {
-    name: exchangeName,
-    ticket: ticket,
-    cost: 0.005,
-    bid: 0,
-    ask: 0
-  };
-
-  try {
+  const market = await retries(async () => {
     const exchange = new ccxt[exchangeName]();
-    const market = await exchange.fetchTicker(ticket);
-    if (market != undefined && market != null) {
-      result.bid = market.bid;
-      result.ask = market.ask;
-    }
-  } catch (error) {
+    return exchange.fetchTicker(ticket);
+  })
 
-  } finally {
-    return result;
+  if (!market) {
+    throw new Error('Exchange ' + exchangeName + ' did not return market for ' + ticket)
+  }
+
+  return {
+    exchangeName,
+    ticket,
+    cost: 0.005,  // Fábio: assume slightly larger cost and go with it
+    bid: market.bid,
+    ask: market.ask
   }
 }
 
@@ -64,42 +70,60 @@ async function prepareTickets() {
   let api = {}
   let exchanges = [];
 
-  if (configs.arbitrage.filter.exchanges) {
-    exchanges = configs.arbitrage.exchanges;
+  if (configs.filter.exchanges) {
+    exchanges = configs.exchanges;
   } else {
     exchanges = ccxt.exchanges;
   }
 
-  for (let i = exchanges.length - 1; i >= 0; i--) {
-    let name = exchanges[i];
+  for (const exchangeName of exchanges) {
     try {
-      let _instance = new ccxt[name]();
-      await _instance.loadMarkets();
-      api[name] = _instance;
+      await retries(async () => {
+        api[exchangeName] = new ccxt[exchangeName]();
+        await api[exchangeName].loadMarkets();
+      })
     } catch (error) {
       console.error(colors.red('Error:'), error.message);
-      exchanges.splice(exchanges.indexOf(name), 1);
+      exchanges.splice(exchanges.indexOf(exchangeName), 1);
     }
   }
 
   let symbols = [];
-  ccxt.unique(ccxt.flatten(exchanges.map(name => api[name].symbols))).filter(symbol =>
-    ((configs.arbitrage.filter.tickets) ? configs.arbitrage.tickets.map(tn =>
-      (symbol.indexOf(tn) >= 0) ? symbols.push(symbol) : 0) : symbols.push(symbol)));
 
-  let arbitrables = symbols.filter(symbol => exchanges.filter(name =>
-    (api[name].symbols.indexOf(symbol) >= 0)).length > 1).sort((id1, id2) =>
-    (id1 > id2) ? 1 : ((id2 > id1) ? -1 : 0));
+  const allSymbols = lodash.uniq(
+    exchanges
+      .map(name => api[name].symbols)
+      .reduce((a, b) => a.concat(b), [])
+  )
 
-  let tickets = arbitrables.map(symbol => {
-    let row = {
-      symbol,
-      exchanges: []
-    };
-    for (let name of exchanges)
-      if (api[name].symbols.indexOf(symbol) >= 0)
-        row.exchanges.push(name);
-    return row
+  allSymbols.forEach(symbol => {
+    if (configs.filter.tickets) {
+      configs.tickets.forEach(configTicket => {
+        if (symbol.split('/').includes(configTicket)) {
+          symbols.push(symbol)
+        }
+      })
+    } else {
+      symbols.push(symbol)
+    }
+  })
+
+  const arbitrables = symbols
+    .filter(symbol => {
+      const exchangesTradingSymbol = exchanges
+        .filter(name => api[name].symbols.includes(symbol))
+      return exchangesTradingSymbol.length >= 2
+    })
+    .sort()
+
+  const tickets = arbitrables.map(symbol => {
+    const exchangesTradingThis = []
+
+    for (const name of exchanges)
+      if (api[name].symbols.includes(symbol))
+        exchangesTradingThis.push(name);
+
+    return { symbol, exchanges: exchangesTradingThis }
   });
 
   console.info('Exchanges:', colors.green(exchanges.length), '| Tickets:', colors.green(tickets.length));

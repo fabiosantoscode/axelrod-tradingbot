@@ -9,72 +9,59 @@ const fs = require('fs');
 
 let lastOpportunities = [];
 
-exports.checkOpportunity = async function(prices) {
+try {
+  lastOpportunities = JSON.parse(fs.readFileSync('data/opportunities.json', 'utf-8'))
+} catch (e) {
+  console.log('Could not find data/opportunities.json, starting with an empty file.')
+  lastOpportunities = []
+}
 
-  let bestBid = lodash.maxBy(prices, function(item) {
-    return item.bid
-  });
-
-  let bestAsk = lodash.minBy(prices, function(item) {
-    return item.ask
-  });
+exports.getOrder = async function({ prices, ticket, funds }) {
+  const bestBid = lodash.maxBy(prices, 'bid');
+  const bestAsk = lodash.minBy(prices, 'ask');
 
   if (bestBid.bid > bestAsk.ask) {
+    const amount = funds / bestAsk.ask;
 
-    let funds = getFunds();
-    let amount = funds / bestAsk.ask;
+    const bought = bestAsk.ask * amount;
+    const sould = bestBid.bid * amount;
 
-    let bought = bestAsk.ask * amount;
-    let sould = bestBid.bid * amount;
+    const cost = (bought * bestAsk.cost) + (sould * bestBid.cost);
 
-    let cost = (bought * bestAsk.cost) + (sould * bestBid.cost);
+    const estimatedGain = (sould - (bought + cost)).toFixed(2);
+    const percentage = ((estimatedGain / funds) * 100).toFixed(2);
 
-    let estimatedGain = (sould - (bought + cost)).toFixed(2);
-    let percentage = ((estimatedGain / funds) * 100).toFixed(2);
-
-    let opportunity = {
-      id: bestAsk.ticket.toLowerCase() + '-' + bestAsk.name + '-' + bestBid.name,
+    const opportunity = {
+      id: ticket + '-' + bestAsk.exchangeName + '-' + bestBid.exchangeName,
       created_at: new Date(),
-      ticket: bestAsk.ticket,
+      ticket,
       amount: Number(amount.toFixed(8)),
-      buy_at: bestAsk.name,
+      buy_at: bestAsk.exchangeName,
       ask: bestAsk.ask,
-      sale_at: bestBid.name,
+      sale_at: bestBid.exchangeName,
       bid: bestBid.bid,
-      gain: Number(percentage)
+      gain: Number(percentage),
+      estimated_gain: estimatedGain
     }
 
     let index = lastOpportunities.indexOf(opportunity.id);
-    if (index == -1 && percentage >= configs.arbitrage.openOpportunity) {
-
-      console.log('');
-      console.info('✔ Opportunity found:'.green);
-      console.info('  Estimated gain:', colors.green(percentage), '% |', colors.green(estimatedGain));
-      console.info('\n', util.inspect(opportunity, {
-        colors: true
-      }));
-
+    if (index == -1 && percentage >= configs.openOpportunity) {
       register(opportunity);
       lastOpportunities.push(opportunity.id);
+      writeOpportunitiesFile()
 
-    } else if (index != -1 && percentage <= configs.arbitrage.closeOpportunity) {
+      return ['buy', opportunity]
+    } else if (index != -1 && percentage <= configs.closeOpportunity) {
+      lastOpportunities.splice(index, 1);
+      writeOpportunitiesFile()
 
-      console.log('');
-      console.info(colors.yellow('✔ Opportunity closed: %s'), opportunity.id);
-      lastOpportunities.splice(index);
-
+      return ['sell', opportunity]
     }
-
   }
-
-}
-
-function getFunds() {
-  return 1000.00;
+  return []
 }
 
 function register(opportunity) {
-
   let toCsv = {
     data: opportunity,
     hasCSVColumnTitle: false
@@ -82,11 +69,12 @@ function register(opportunity) {
 
   try {
     let csv = json2csv(toCsv) + '\r\n';
-    fs.appendFile('data/arbitrage.csv', csv, function(err) {
-      if (err) throw err;
-    });
+    fs.appendFileSync('data/arbitrage.csv', csv);
   } catch (error) {
-    console.error(colors.red('Error:'), error.message);
+    console.error(error)
   }
+}
 
+function writeOpportunitiesFile() {
+  fs.writeFileSync('data/opportunities.json', JSON.stringify(lastOpportunities, null, 2))
 }
