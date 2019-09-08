@@ -44,11 +44,11 @@ async function startArbitrageByTicket(ticket, isFirstExecution) {
     }
   }
 
-  const [openOrClose, opportunity] = arbitrage.getOrder({ prices, ticket, funds: 1000 })
+  const [openOrClose, opportunity] = arbitrage.getOrder({ prices, ticket })
 
   if (openOrClose) {
     const orderType = openOrClose === 'open' ? colors.red(openOrClose) : colors.green(openOrClose)
-    console.log('ORDER: ' + orderType + ' ' + opportunity.amount + ' ' + opportunity.ticket.symbol, opportunity)
+    console.log('ORDER: ' + orderType + ' ' + opportunity.ticket.symbol, opportunity)
   }
 }
 
@@ -105,13 +105,15 @@ async function prepareTickets() {
     }
   })
 
-  const arbitrables = symbols
-    .filter(symbol => {
-      const exchangesTradingSymbol = exchanges
-        .filter(exchangeName => exchange(exchangeName).symbols.includes(symbol))
-      return exchangesTradingSymbol.length >= 2
-    })
-    .sort()
+  const arbitrables = lodash.uniq(
+    symbols
+      .filter(symbol => {
+        const exchangesTradingSymbol = exchanges
+          .filter(exchangeName => exchange(exchangeName).symbols.includes(symbol))
+        return exchangesTradingSymbol.length >= 2
+      })
+      .sort(),
+  )
 
   const tickets = arbitrables.map(symbol => {
     const exchangesTradingThis = []

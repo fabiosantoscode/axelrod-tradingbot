@@ -1,9 +1,7 @@
 
 module.exports = {
-  // Was .04 initially
-  openOpportunity: 0.001,
-  // Was .02 initially
-  closeOpportunity: 0,
+  openOpportunity: .04,
+  closeOpportunity: .02,
   // Set these two to true so we can choose which exchanges and coins we want to trade
   filter: {
     exchanges: true,
@@ -12,6 +10,7 @@ module.exports = {
   exchanges: [
     'kraken',
     'coss',
+    'poloniex',
     /*
     'gateio',
     'binance',
@@ -20,13 +19,11 @@ module.exports = {
     'upbit',
     'mercado'
     */
-  ].sort(),
+  ],
   tickets: [
+    'BTC',
+    'DASH',
     'LTC',
-    'ETH',
-    'XMR',
-    'BCH',
-    'BSV',
-    'DOGE'
-  ].sort()
+    'USDT'
+  ]
 }

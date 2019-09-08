@@ -4,17 +4,16 @@ const fs = require('fs')
 const util = require('util')
 const lodash = require('lodash')
 const colors = require('colors')
-const json2csv = require('json2csv')
 const configs = require('../config/settings')
 const { exchange } = require('./exchanges')
 
-let lastOpportunities = [];
+let openOpportunities = [];
 
 try {
-  lastOpportunities = JSON.parse(fs.readFileSync('data/opportunities.json', 'utf-8'))
+  openOpportunities = JSON.parse(fs.readFileSync('data/opportunities.json', 'utf-8'))
 } catch (e) {
   console.log('Could not find data/opportunities.json, starting with an empty file.')
-  lastOpportunities = []
+  openOpportunities = []
 }
 
 const getCost = (price, ticket) => {
@@ -23,14 +22,26 @@ const getCost = (price, ticket) => {
   return Math.max(taker, maker)
 }
 
-exports.getOrder = function({ prices, ticket, funds }) {
+exports.getOrder = function({ prices, ticket }) {
   const bestBid = lodash.maxBy(prices, 'bid')
-  const bestAsk = lodash.minBy(prices, 'ask')
+  const bestAsk = lodash.minBy(prices.filter(p => p.exchangeName !== bestBid.exchangeName), 'ask')
 
-  if (bestBid.exchangeName === bestAsk.exchangeName) return []
+  if (!bestAsk) {
+    console.log('Couldnt find a best ask for ' + ticket.symbol)
+    return []
+  }
+
+  const oppId = ticket.symbol + '-' + bestAsk.exchangeName + '-' + bestBid.exchangeName
+  const haveOpenOpportunity = openOpportunities.find(opp => opp.id === oppId)
+
+  // XXX: Maybe we want to sell existing opportunities even when the best ask isn't the best possible ask
 
   if (bestBid.bid <= bestAsk.ask) return []
 
+  // short at bestBid.exchangeName and long at bestAsk.exchangeName
+  // Their prices will eventually normalise
+
+  const funds = 1 // XXX: do we really need the real funds here?
   const amount = funds / bestAsk.ask;
 
   const bought = bestAsk.ask * amount;
@@ -38,53 +49,36 @@ exports.getOrder = function({ prices, ticket, funds }) {
 
   const cost = (bought * getCost(bestAsk, ticket)) + (sold * getCost(bestBid, ticket))
 
-  const estimatedGain = sold - (bought + cost)
-  const gainProportion = estimatedGain / funds
+  const gain = sold - (bought + cost)
 
   const opportunity = {
-    id: ticket.symbol + '-' + bestAsk.exchangeName + '-' + bestBid.exchangeName,
+    id: oppId,
     created_at: new Date(),
     ticket,
-    amount: Number(amount.toFixed(8)),
-    buy_at: bestAsk.exchangeName,
-    ask: bestAsk.ask,
-    sale_at: bestBid.exchangeName,
-    bid: bestBid.bid,
-    percentage: gainProportion * 100,
-    estimated_gain: estimatedGain,
-    cost
+    bestAsk,
+    bestBid,
+    cost,
+    gain,
   }
 
-  const haveOpportunity = lastOpportunities.find(opp => opp.id === opportunity.id)
-  if (!haveOpportunity && gainProportion >= configs.openOpportunity) {
+  if (!haveOpenOpportunity && opportunity.gain >= configs.openOpportunity) {
     register(opportunity)
-    lastOpportunities.push(opportunity)
+    openOpportunities.push(opportunity)
     writeOpportunitiesFile()
 
     return ['open', opportunity]
-  } else if (haveOpportunity && gainProportion <= configs.closeOpportunity) {
-    lastOpportunities.splice(index, 1)
+  } else if (haveOpenOpportunity && opportunity.gain <= configs.closeOpportunity) {
+    openOpportunities = openOpportunities.filter(opp => opp.id !== oppId)
     writeOpportunitiesFile()
 
+    delete opportunity.gain
+    delete opportunity.cost
+    delete opportunity.created_at
     return ['close', opportunity]
   }
   return []
 }
 
-function register(opportunity) {
-  let toCsv = {
-    data: opportunity,
-    hasCSVColumnTitle: false
-  };
-
-  try {
-    let csv = json2csv(toCsv) + '\r\n';
-    fs.appendFileSync('data/arbitrage.csv', csv)
-  } catch (error) {
-    console.error(error)
-  }
-}
-
 function writeOpportunitiesFile() {
-  fs.writeFileSync('data/opportunities.json', JSON.stringify(lastOpportunities, null, 2))
+  fs.writeFileSync('data/opportunities.json', JSON.stringify(openOpportunities, null, 2))
 }
