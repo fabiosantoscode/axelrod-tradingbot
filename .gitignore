@@ -4,3 +4,5 @@
 .vscode
 package-lock.json
 data/*
+.exchange-keys.json
+.exchange-keys.json

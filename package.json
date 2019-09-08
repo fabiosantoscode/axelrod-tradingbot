@@ -4,7 +4,7 @@
   "version": "1.0.1",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon --ignore data index.js"
   },
   "author": {
     "name": "Gabriel Barbosa",

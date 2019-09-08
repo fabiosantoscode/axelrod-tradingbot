@@ -7,51 +7,53 @@ const configs = require('../config/settings');
 const arbitrage = require('./arbitrage');
 const colors = require('colors');
 const retries = require('./retries')
+const { exchange } = require('./exchanges')
 
-const INTERVAL = configs.checkInterval > 0
-  ? Number(configs.checkInterval)
-  : 1
+const unacceptableTicket = Symbol('unacceptable ticket')
 
 exports.initialize = async function() {
-  console.info('\nLoading exchanges and tickets...');
-  const tickets = await prepareTickets();
-  for (const ticket of tickets) {
-    await (async function loop(isFirstExecution) {
+  console.info('\nLoading exchanges and tickets...')
+  const tickets = await prepareTickets()
+  await async.filterLimit(tickets, 1, async ticket => {
+    const result = await startArbitrageByTicket(ticket, /* first execution */true)
+    return result !== unacceptableTicket
+  })
+  console.info('Bot started.')
+  while (true) {
+    for (const ticket of tickets) {
       try {
-        await startArbitrageByTicket(ticket, isFirstExecution);
+        await startArbitrageByTicket(ticket);
       } catch (e) {
         console.error(e)
       }
-      setTimeout(loop, INTERVAL * 60 * 1000)
-    })(true)
+    }
   }
-  console.info('Bot started.');
 }
 
 async function startArbitrageByTicket(ticket, isFirstExecution) {
-  try {
-    if (isFirstExecution) {
+  const prices = await Promise.all(ticket.exchanges.map((exchangeName) =>
+      fetchDataByTicketAndExchange(ticket.symbol, exchangeName)))
+
+  if (isFirstExecution) {
+    const acceptable = lodash.minBy(prices, 'ask').ask > 0.005  /* Avoid floating point precision issues */
+    if (acceptable) {
       console.log(ticket.symbol + ':', ticket.exchanges)
+    } else {
+      console.log('unacceptable: ' + ticket.symbol)
+      return unacceptableTicket
     }
-    const prices = await Promise.all(ticket.exchanges.map((exchange) =>
-        fetchDataByTicketAndExchange(ticket.symbol, exchange)))
+  }
 
-    const [buyOrSell, opportunity] = await arbitrage.getOrder({ prices, ticket, funds: 1000 })
+  const [openOrClose, opportunity] = arbitrage.getOrder({ prices, ticket, funds: 1000 })
 
-    if (buyOrSell) {
-      const orderType = buyOrSell === 'buy' ? colors.red(buyOrSell) : colors.green(buyOrSell)
-      console.log('ORDER: ' + orderType + ' ' + opportunity.amount + ' ' + opportunity.ticket.symbol, opportunity)
-    }
-  } catch (error) {
-    console.error(colors.red('Error:'), error.message);
+  if (openOrClose) {
+    const orderType = openOrClose === 'open' ? colors.red(openOrClose) : colors.green(openOrClose)
+    console.log('ORDER: ' + orderType + ' ' + opportunity.amount + ' ' + opportunity.ticket.symbol, opportunity)
   }
 }
 
 async function fetchDataByTicketAndExchange(ticket, exchangeName) {
-  const market = await retries(async () => {
-    const exchange = new ccxt[exchangeName]();
-    return exchange.fetchTicker(ticket);
-  })
+  const market = await retries(() => exchange(exchangeName).fetchTicker(ticket))
 
   if (!market) {
     throw new Error('Exchange ' + exchangeName + ' did not return market for ' + ticket)
@@ -60,14 +62,12 @@ async function fetchDataByTicketAndExchange(ticket, exchangeName) {
   return {
     exchangeName,
     ticket,
-    cost: 0.005,  // Fábio: assume slightly larger cost and go with it
     bid: market.bid,
     ask: market.ask
   }
 }
 
 async function prepareTickets() {
-  let api = {}
   let exchanges = [];
 
   if (configs.filter.exchanges) {
@@ -78,21 +78,18 @@ async function prepareTickets() {
 
   for (const exchangeName of exchanges) {
     try {
-      await retries(async () => {
-        api[exchangeName] = new ccxt[exchangeName]();
-        await api[exchangeName].loadMarkets();
-      })
+      await retries(() => exchange(exchangeName).loadMarkets())
     } catch (error) {
       console.error(colors.red('Error:'), error.message);
       exchanges.splice(exchanges.indexOf(exchangeName), 1);
     }
   }
 
-  let symbols = [];
+  const symbols = []
 
   const allSymbols = lodash.uniq(
     exchanges
-      .map(name => api[name].symbols)
+      .map(exchangeName => exchange(exchangeName).symbols)
       .reduce((a, b) => a.concat(b), [])
   )
 
@@ -111,7 +108,7 @@ async function prepareTickets() {
   const arbitrables = symbols
     .filter(symbol => {
       const exchangesTradingSymbol = exchanges
-        .filter(name => api[name].symbols.includes(symbol))
+        .filter(exchangeName => exchange(exchangeName).symbols.includes(symbol))
       return exchangesTradingSymbol.length >= 2
     })
     .sort()
@@ -119,9 +116,9 @@ async function prepareTickets() {
   const tickets = arbitrables.map(symbol => {
     const exchangesTradingThis = []
 
-    for (const name of exchanges)
-      if (api[name].symbols.includes(symbol))
-        exchangesTradingThis.push(name);
+    for (const exchangeName of exchanges)
+      if (exchange(exchangeName).symbols.includes(symbol))
+        exchangesTradingThis.push(exchangeName);
 
     return { symbol, exchanges: exchangesTradingThis }
   });
