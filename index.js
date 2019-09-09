@@ -1,6 +1,6 @@
 'use strict';
 
-const market = require('./core/market');
+const market = require('./lib/market');
 
 console.log('Axelrod Trading Bot - Follow the money!')
 console.log('=======================================')
