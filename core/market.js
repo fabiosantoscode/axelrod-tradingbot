@@ -11,45 +11,33 @@ const { exchange } = require('./exchanges')
 
 const unacceptableTicket = Symbol('unacceptable ticket')
 
-exports.initialize = async function() {
-  console.info('\nLoading exchanges and tickets...')
-  const tickets = await prepareTickets()
-  await async.filterLimit(tickets, 1, async ticket => {
-    const result = await startArbitrageByTicket(ticket, /* first execution */true)
-    return result !== unacceptableTicket
-  })
-  console.info('Bot started.')
-  while (true) {
-    for (const ticket of tickets) {
-      try {
-        await startArbitrageByTicket(ticket);
-      } catch (e) {
-        console.error(e)
-      }
-    }
+async function isAcceptable(ticket) {
+  const prices = await getPrices(ticket)
+
+  /* Avoid floating point precision issues */
+  const acceptable = lodash.minBy(prices, 'ask').ask > 1e-7
+  if (!acceptable) {
+    console.log('unacceptable: ' + ticket.symbol)
+  } else {
+    console.log(ticket.symbol, ticket.exchanges)
   }
+  return acceptable
 }
 
-async function startArbitrageByTicket(ticket, isFirstExecution) {
-  const prices = await Promise.all(ticket.exchanges.map((exchangeName) =>
-      fetchDataByTicketAndExchange(ticket.symbol, exchangeName)))
+exports.initialize = async function() {
+  console.info('\nLoading exchanges and tickets...')
+  let tickets = await prepareTickets()
+  tickets = await async.filter(tickets, isAcceptable)
+  console.info('Bot started.')
+  await Promise.all([
+    arbitrage.openOpportunitiesLoop({ tickets, getPrices }),
+    arbitrage.closeOpportunitiesLoop({ getPrices })
+  ])
+}
 
-  if (isFirstExecution) {
-    const acceptable = lodash.minBy(prices, 'ask').ask > 0.005  /* Avoid floating point precision issues */
-    if (acceptable) {
-      console.log(ticket.symbol + ':', ticket.exchanges)
-    } else {
-      console.log('unacceptable: ' + ticket.symbol)
-      return unacceptableTicket
-    }
-  }
-
-  const [openOrClose, opportunity] = arbitrage.getOrder({ prices, ticket })
-
-  if (openOrClose) {
-    const orderType = openOrClose === 'open' ? colors.red(openOrClose) : colors.green(openOrClose)
-    console.log('ORDER: ' + orderType + ' ' + opportunity.ticket.symbol, opportunity)
-  }
+async function getPrices(ticket) {
+  return Promise.all(ticket.exchanges.map((exchangeName) =>
+    fetchDataByTicketAndExchange(ticket.symbol, exchangeName)))
 }
 
 async function fetchDataByTicketAndExchange(ticket, exchangeName) {
@@ -96,7 +84,8 @@ async function prepareTickets() {
   allSymbols.forEach(symbol => {
     if (configs.filter.tickets) {
       configs.tickets.forEach(configTicket => {
-        if (symbol.split('/').includes(configTicket)) {
+        const [base, quote] = symbol.split('/')
+        if (quote === configTicket) {
           symbols.push(symbol)
         }
       })

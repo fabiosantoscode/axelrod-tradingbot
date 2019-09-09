@@ -16,67 +16,92 @@ try {
   openOpportunities = []
 }
 
-const getCost = (price, ticket) => {
-  const { exchangeName, symbol } = price
-  const { taker, maker } = exchange(exchangeName).markets[ticket.symbol]
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
+exports.openOpportunitiesLoop = async function({ tickets, getPrices }) {
+  while (true) {
+    for (const ticket of tickets) {
+      try {
+        const prices = await getPrices(ticket)
+        const opportunity = getOpportunity({ prices, ticket });
+        if (opportunity.gain >= configs.openOpportunity
+          && !openOpportunities.find(o => o.id === opportunity.id)
+        ) {
+          opportunity.openedAt = new Date().toISOString()
+          console.log(JSON.stringify({ type: 'open', opportunity }))
+          openOpportunities.push(opportunity)
+          writeOpportunitiesFile()
+        }
+      } catch (e) {
+        console.error(e)
+      }
+      if (openOpportunities.length) {
+        // We're observing opportunities, the other loop is more important
+        await wait(5000)
+      }
+    }
+  }
+}
+
+exports.closeOpportunitiesLoop = async ({ getPrices }) => {
+  while (true) {
+    while (!openOpportunities.length) await wait(500)
+    for (const oldOpp of openOpportunities) {
+      const prices = await getPrices(oldOpp.ticket)
+      const opportunity = getOpportunity({ prices, ticket: oldOpp.ticket })
+      if (opportunity.gain <= configs.closeOpportunity) {
+        openOpportunities = openOpportunities
+          .filter(opp => opp.id !== oldOpp.id)
+        writeOpportunitiesFile()
+        opportunity.openedAt = oldOpp.openedAt
+        opportunity.closedAt = new Date().toISOString()
+        console.log(JSON.stringify({ type: 'close', opportunity }))
+      }
+    }
+  }
+}
+
+const getCost = (exchangeName, symbol) => {
+  const { taker, maker } = exchange(exchangeName).markets[symbol]
   return Math.max(taker, maker)
 }
 
-exports.getOrder = function({ prices, ticket }) {
+function getOpportunity({ prices, ticket }) {
   const bestBid = lodash.maxBy(prices, 'bid')
   const bestAsk = lodash.minBy(prices.filter(p => p.exchangeName !== bestBid.exchangeName), 'ask')
 
   if (!bestAsk) {
     console.log('Couldnt find a best ask for ' + ticket.symbol)
-    return []
+    return
   }
 
   const oppId = ticket.symbol + '-' + bestAsk.exchangeName + '-' + bestBid.exchangeName
-  const haveOpenOpportunity = openOpportunities.find(opp => opp.id === oppId)
-
-  // XXX: Maybe we want to sell existing opportunities even when the best ask isn't the best possible ask
-
-  if (bestBid.bid <= bestAsk.ask) return []
 
   // short at bestBid.exchangeName and long at bestAsk.exchangeName
   // Their prices will eventually normalise
 
-  const funds = 1 // XXX: do we really need the real funds here?
-  const amount = funds / bestAsk.ask;
+  const amount = 1 / bestAsk.ask;
 
+  // TODO turn the muls into a div
+  // (since there's a 1/ask above)
   const bought = bestAsk.ask * amount;
   const sold = bestBid.bid * amount;
 
-  const cost = (bought * getCost(bestAsk, ticket)) + (sold * getCost(bestBid, ticket))
+  const cost = (bought * getCost(bestAsk.exchangeName, ticket.symbol))
+    + (sold * getCost(bestBid.exchangeName, ticket.symbol))
 
   const gain = sold - (bought + cost)
 
-  const opportunity = {
+  return Object.seal({
     id: oppId,
-    created_at: new Date(),
     ticket,
     bestAsk,
     bestBid,
     cost,
     gain,
-  }
-
-  if (!haveOpenOpportunity && opportunity.gain >= configs.openOpportunity) {
-    register(opportunity)
-    openOpportunities.push(opportunity)
-    writeOpportunitiesFile()
-
-    return ['open', opportunity]
-  } else if (haveOpenOpportunity && opportunity.gain <= configs.closeOpportunity) {
-    openOpportunities = openOpportunities.filter(opp => opp.id !== oppId)
-    writeOpportunitiesFile()
-
-    delete opportunity.gain
-    delete opportunity.cost
-    delete opportunity.created_at
-    return ['close', opportunity]
-  }
-  return []
+    openedAt: null,
+    closedAt: null,
+  })
 }
 
 function writeOpportunitiesFile() {
