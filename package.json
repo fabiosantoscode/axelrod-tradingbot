@@ -3,8 +3,8 @@
   "description": "Trading bot for cryptocurrency",
   "version": "1.0.1",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon --ignore data index.js"
+    "start": "node index.js | tee -a data/log.txt | bunyan",
+    "dev": "nodemon --ignore data index.js | bunyan"
   },
   "author": {
     "name": "Gabriel Barbosa",
@@ -15,6 +15,8 @@
   },
   "dependencies": {
     "async": "^3.1.0",
+    "big.js": "^5.2.2",
+    "bunyan": "^1.8.12",
     "ccxt": "^1.10.713",
     "colors": "^1.1.2",
     "json2csv": "^3.11.5",
