@@ -1,7 +1,7 @@
 
 module.exports = {
-  openOpportunity: .04,
-  closeOpportunity: .02,
+  openOpportunity: .012,
+  closeOpportunity: .008,
   // Set these two to true so we can choose which exchanges and coins we want to trade
   filter: {
     exchanges: true,
@@ -22,8 +22,6 @@ module.exports = {
   ],
   tickets: [
     'BTC',
-    'DASH',
-    'LTC',
     'USDT'
   ]
 }

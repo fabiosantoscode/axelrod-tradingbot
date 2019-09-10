@@ -4,7 +4,7 @@
   "version": "1.0.1",
   "scripts": {
     "start": "node index.js | tee -a data/log.txt | bunyan -o json",
-    "dev": "nodemon --ignore data index.js | bunyan -o json"
+    "dev": "nodemon --ignore data index.js | bunyan"
   },
   "author": {
     "name": "Gabriel Barbosa",
