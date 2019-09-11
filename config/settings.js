@@ -1,4 +1,10 @@
 
+const localSettings = (() => {
+  try {
+    return require('../conf.js')
+  } catch (e) {}
+})()
+
 const investment = .08
 
 module.exports = {
@@ -23,5 +29,6 @@ module.exports = {
   ],
   tickets: [
     'BTC',
-  ]
+  ],
+  ...localSettings
 }
