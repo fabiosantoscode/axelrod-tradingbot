@@ -1,7 +1,10 @@
 
+const investment = .0005
+
 module.exports = {
-  openOpportunity: .01,
-  closeOpportunity: .0025,
+  investment,
+  openOpportunity: investment * .01,
+  closeOpportunity: investment * .005,
   // Set these two to true so we can choose which exchanges and coins we want to trade
   filter: {
     exchanges: true,
